@@ -1,0 +1,3 @@
+Snapshot of the custom sway setup before script cleanup
+(hdmi.sh, lock.sh, window_switcher.sh and their binds).
+Reference only — not used by NixOS. Active config is ../config.

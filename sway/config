@@ -1,0 +1,316 @@
+
+### ── VARIABLES ───────────────────────────────────────────────────────────────
+set $mod   Mod4
+set $alt   Mod1
+set $term  alacritty
+set $ws1 "1:「 1 」"
+set $ws2 "2:「 2 」"
+set $ws3 "3:「 3 」"
+set $ws4 "4:「 4 」"
+set $ws5 "5:「 5 」"
+set $lock pgrep -x swaylock || swaylock
+
+### ── WAYLAND / XDG ENVIRONMENT ─────────────────────────────────────────────
+exec dbus-update-activation-environment \
+    DISPLAY \
+    WAYLAND_DISPLAY \
+    SWAYSOCK \
+    XDG_CURRENT_DESKTOP=sway \
+    XDG_SESSION_TYPE=wayland \
+    MOZ_ENABLE_WAYLAND=1
+
+
+# NixOS: portals are systemd user units (see xdg.portal.*), not /usr/lib binaries.
+# D-Bus activation covers the implementations; start the broker with the session.
+exec systemctl --user start xdg-desktop-portal.service
+
+### ── AUTOSTART ───────────────────────────────────────────────────────────────
+
+# Notification daemon
+exec mako
+# Network manager tray icon
+exec nm-applet --indicator
+
+### ── OUTPUT (wallpaper) ──────────────────────────────────────────────────────
+# Sway's native output command handles wallpaper — no swaybg needed here.
+# If you want swaybg animations later, replace with:
+#   exec swaybg -i ~/Pictures/artix-wallpaper.png -m fill
+output * bg ~/Pictures/artix-wallpaper.png fill
+
+### ── INPUT ──────────────────────────────────────────────────────────────────
+
+# Keyboard — matches your: xset r rate 300 50
+input "type:keyboard" {
+    repeat_delay 300
+    repeat_rate  50
+    # Optional: remap Caps Lock to Escape (handy for Neovim)
+    xkb_options caps:escape
+}
+
+# Touchpad
+input "type:touchpad" {
+    tap                enabled
+    natural_scroll     enabled
+    dwt                enabled       # Disable while typing
+    accel_profile      flat
+    pointer_accel      0.7
+    tap_button_map     lrm
+}
+
+# Mouse — flat profile, matches your: xinput accel -1
+input "type:pointer" {
+    accel_profile  flat
+    pointer_accel  0.7
+}
+
+### ── FOCUS BEHAVIOR ─────────────────────────────────────────────────────────
+# bspwm: focus_follows_pointer true
+focus_follows_mouse  yes
+
+# bspwm: pointer_follows_focus true — warp cursor to focused window center
+mouse_warping        container
+
+# Super+grave / Super+Tab cycle back (bspwm: bspc desktop -f last)
+workspace_auto_back_and_forth yes
+
+### ── APPEARANCE ─────────────────────────────────────────────────────────────
+
+# No titlebars — bspwm has none
+font pango:FiraCode Nerd Font 7
+title_align center
+default_border         pixel 1
+default_floating_border pixel 2
+
+# Hide border on the side touching the screen edge (bspwm: borderless when 1 window)
+hide_edge_borders smart
+
+gaps inner 6
+gaps outer 0
+
+# Gaps only apply when more than 1 window (bspwm: gapless_monocle false + borderless_monocle true)
+smart_gaps   on
+smart_borders on
+
+# Window border colours — from your bspwm palette
+# class                 border  bg      text    indicator child_border
+client.focused          #000409 #000409 #ffffff #000409    #000b1a
+client.focused_inactive #000409 #000409 #888888 #000409    #000409
+client.unfocused        #000409 #000409 #555555 #000409    #000409
+client.urgent           #cc0000 #cc0000 #ffffff #cc0000    #cc0000
+
+### ── STATUS BAR ─────────────────────────────────────────────────────────────
+bar {
+    position top
+    swaybar_command swaybar
+    # swaybar-rust is not packaged on NixOS — stock clock until you build it
+    status_command while date +'%Y-%m-%d %X'; do sleep 1; done
+    font pango:JetBrainsMono Nerd Font 10
+   # Hide the native sway workspace buttons and title if they are active
+    workspace_buttons yes
+    strip_workspace_numbers yes
+    # binding_mode_indicator no 
+    colors {
+        background #000409
+        statusline #ffffff
+        separator #000409
+        
+        # Clean workspaces: No backgrounds, just text color changes
+        # class             border    backgr.   text
+        focused_workspace   #000409   #000409   #ffffff
+        active_workspace    #000409   #000409   #a0a0a0
+        inactive_workspace  #000409   #000409   #555e6b
+        urgent_workspace    #000409   #000409   #c46464
+    }
+}
+
+### ── FLOATING MOUSE BINDINGS ────────────────────────────────────────────────
+# Super+LMB = drag float, Super+RMB = resize float
+# bspwm: pointer_modifier super + pointer_action1 move + pointer_action2/3 resize
+floating_modifier $mod normal
+
+### ── KEY BINDINGS ───────────────────────────────────────────────────────────
+
+## ── Lock / Session ────────────────────────────────────────────────────────
+# bspwm: super+shift+p → i3lock
+bindsym $mod+Shift+p    exec $lock
+
+# bspwm: super+alt+q → bspc quit  |  super+alt+r → bspc wm -r
+bindsym $mod+$alt+q     exit
+bindsym $mod+$alt+r     reload
+
+# bspwm: super+Escape → pkill -USR1 sxhkd  (reload = nearest equivalent)
+bindsym $mod+Escape     reload
+
+## ── Terminal ──────────────────────────────────────────────────────────────
+# bspwm: super+Return → urxvtc / super+alt+Return → uxterm
+bindsym $mod+Return         exec $term
+bindsym $mod+$alt+Return    exec $term
+
+## ── Launchers ─────────────────────────────────────────────────────────────
+# Apps
+bindsym $mod+r exec fuzzel --no-icons --prompt="󰀻 Apps: "
+
+# Run
+bindsym $mod+Shift+r exec "compgen -c | sort -u | fuzzel --no-icons  --dmenu --prompt=' Run: ' | xargs -r swaymsg exec --"
+
+bindsym $mod+$alt+f exec sh -c 'file=$(cd ~ && fd --type f --hidden --follow \
+    --exclude .git \
+    --exclude .cache \
+    --exclude .local/share \
+    --exclude node_modules | \
+    fuzzel --no-icons --dmenu --prompt="󰈞 Find File: "); \
+    [ -n "$file" ] || exit 0; \
+    file="$HOME/$file"; \
+    alacritty -e sh -c "cd \"$(dirname "$(realpath "$file")")\" && nvim \"$(realpath "$file")\" && exec \$SHELL"'
+
+## ── File Manager ──────────────────────────────────────────────────────────
+# bspwm: super+shift+f → urxvtc -e lf
+bindsym $mod+Shift+f    exec $term -e lf
+
+## ── Applications ──────────────────────────────────────────────────────────
+# Browser
+bindsym $mod+Shift+b     exec firefox
+bindsym $mod+$alt+b     exec ~/.config/custom_scripts/run_actions.sh
+bindsym $mod+$alt+x     exec ~/.config/custom_scripts/powermenu.sh
+
+## ── Screenshot (grim + slurp — Wayland native, replaces flameshot) ────────
+# Region → file + clipboard (like flameshot gui)
+bindsym Print exec \
+    grim -g "$(slurp)" - | tee \
+    ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png | wl-copy
+
+# Full screen → file
+bindsym $mod+Print exec \
+    grim ~/Pictures/Screenshots/$(date +%Y%m%d_%H%M%S).png
+
+# Region → clipboard only (quick paste)
+bindsym $mod+Shift+s exec \
+    grim -g "$(slurp)" - | wl-copy
+
+## ── Window Management ─────────────────────────────────────────────────────
+# bspwm: super+w → bspc node -c  |  super+shift+w → bspc node -k
+bindsym $mod+w          kill
+bindsym $mod+Shift+w    kill
+
+## ── Focus Direction (vim keys) ────────────────────────────────────────────
+# bspwm: super+hjkl → bspc node -f west/south/north/east
+bindsym $mod+h  focus left
+bindsym $mod+j  focus down
+bindsym $mod+k  focus up
+bindsym $mod+l  focus right
+
+## ── Move / Swap Windows ───────────────────────────────────────────────────
+# bspwm: super+shift+hjkl → bspc node -s west/south/north/east
+bindsym $mod+Shift+h    move left
+bindsym $mod+Shift+j    move down
+bindsym $mod+Shift+k    move up
+bindsym $mod+Shift+l    move right
+
+## ── Floating Window Movement (arrow keys) ─────────────────────────────────
+# bspwm: super+arrow → bspc node -v
+bindsym $mod+Left   move left  20
+bindsym $mod+Down   move down  20
+bindsym $mod+Up     move up    20
+bindsym $mod+Right  move right 20
+
+## ── Layout / States ────────────────────────────────────────────────────────
+# bspwm: super+m → bspc desktop -l next (monocle toggle)
+bindsym $mod+m      layout toggle tabbed split
+
+# bspwm: super+s → bspc node -t floating
+bindsym $mod+s      floating toggle
+
+# bspwm: super+t → bspc node -t tiled
+bindsym $mod+t      floating disable
+
+# bspwm: super+f → bspc node -t fullscreen
+bindsym $mod+f      fullscreen toggle
+
+# bspwm: super+shift+t → pseudo_tiled (sway: split direction toggle is closest)
+bindsym $mod+Shift+t layout toggle splitv splith
+
+# bspwm: super+g → bspc node -s biggest.window (swap with biggest)
+bindsym $mod+g      swap mark __biggest ; mark --toggle __biggest
+
+## ── Focus Next/Prev in Workspace ──────────────────────────────────────────
+# Cycles forward through all windows on the workspace (wraps around)
+# Smooth cyclic wrapping navigation
+bindsym $mod+c         exec bash ~/.local/bin/sway-cycle next
+bindsym $mod+i         exec bash ~/.local/bin/sway-cycle next
+
+bindsym $mod+Shift+c   exec bash ~/.local/bin/sway-cycle prev
+bindsym $mod+o         exec bash ~/.local/bin/sway-cycle prev
+
+## ── Resize (bspwm: super+alt+hjkl expand / super+alt+shift+hjkl contract) ─
+# Expand outward
+bindsym $mod+$alt+h             resize shrink width  20 px
+bindsym $mod+$alt+j             resize grow   height 20 px
+bindsym $mod+$alt+k             resize shrink height 20 px
+bindsym $mod+$alt+l             resize grow   width  20 px
+# Contract inward
+bindsym $mod+$alt+Shift+h       resize grow   width  20 px
+bindsym $mod+$alt+Shift+j       resize shrink height 20 px
+bindsym $mod+$alt+Shift+k       resize grow   height 20 px
+bindsym $mod+$alt+Shift+l       resize shrink width  20 px
+
+## ── Workspace Navigation ──────────────────────────────────────────────────
+# bspwm: super+bracketleft/right → bspc desktop -f prev/next
+bindsym $mod+bracketleft    workspace prev
+bindsym $mod+bracketright   workspace next
+
+# bspwm: super+grave / super+Tab → bspc desktop -f last
+bindsym $mod+grave  workspace back_and_forth
+bindsym $mod+Tab    workspace back_and_forth
+
+# Bind workspaces to keys (Targeting named variables directly)
+bindsym $mod+1 workspace $ws1
+bindsym $mod+2 workspace $ws2
+bindsym $mod+3 workspace $ws3
+bindsym $mod+4 workspace $ws4
+bindsym $mod+5 workspace $ws5
+
+# Move focused container to workspaces
+bindsym $mod+Shift+1 move container to workspace $ws1
+bindsym $mod+Shift+2 move container to workspace $ws2
+bindsym $mod+Shift+3 move container to workspace $ws3
+bindsym $mod+Shift+4 move container to workspace $ws4
+bindsym $mod+Shift+5 move container to workspace $ws5
+## ── Media / Hardware Keys ─────────────────────────────────────────────────
+# --locked makes them work even on the swaylock screen
+bindsym --locked XF86AudioRaiseVolume  exec pactl set-sink-volume @DEFAULT_SINK@ +5%
+bindsym --locked XF86AudioLowerVolume  exec pactl set-sink-volume @DEFAULT_SINK@ -5%
+bindsym --locked XF86AudioMute         exec pactl set-sink-mute   @DEFAULT_SINK@ toggle
+bindsym --locked XF86MonBrightnessUp   exec brightnessctl set +10%
+bindsym --locked XF86MonBrightnessDown exec brightnessctl set 10%-
+
+
+### ── WINDOW RULES ───────────────────────────────────────────────────────────
+
+# nm-applet connection editor pops up floating
+for_window [app_id="nm-applet"] floating enable
+
+# pavucontrol as a float
+for_window [app_id="pavucontrol"] floating enable, resize set 700 450
+
+# Alacritty terminals stay tiled (default behavior — no rule needed)
+
+### ── PERFORMANCE (i3 5th gen Intel HD, 4 GB RAM) ───────────────────────────
+# Intel iGPU works best with the i965 DRI driver (Mesa).
+# Add to /etc/environment or ~/.profile:
+#   LIBVA_DRIVER_NAME=i965
+#   VDPAU_DRIVER=va_gl
+#   MOZ_ENABLE_WAYLAND=1          # Firefox native Wayland
+#   ELECTRON_OZONE_PLATFORM_HINT=auto  # Electron/VS Code native Wayland
+#
+xwayland disable
+# sway-autotiler is not packaged on NixOS — would error on every reload
+# exec_always --no-startup-id "pkill sway_autotiler; sway_autotiler"
+
+### ── NIXOS ───────────────────────────────────────────────────────────────────
+# nixos.conf does this with `exec` (startup only) — repeat it on every reload so
+# graphical-session.target/sway-session.target survive a nixos-rebuild switch.
+exec_always --no-startup-id systemctl --user start sway-session.target
+
+# Ships sway-session.target / dbus env import / portal setup from the NixOS
+# sway module (environment.etc."sway/config.d/nixos.conf").
+include /etc/sway/config.d/*

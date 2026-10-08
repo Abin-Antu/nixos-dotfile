@@ -1,0 +1,60 @@
+#!/bin/sh
+
+DIRECTION=$1
+if [ "$DIRECTION" != "next" ] && [ "$DIRECTION" != "prev" ]; then
+    exit 1
+fi
+
+# Fetch the layout tree from Sway IPC
+TREE=$(swaymsg -t get_tree)
+
+# 1. Locate the active workspace and extract all true leaf window IDs (tiling + floating)
+IDS=$(echo "$TREE" | jq -r '
+  .. | select(.type? == "workspace") 
+  | select(recurse | .focused? == true) 
+  | recurse(.nodes[], .floating_nodes[]) 
+  | select(.name? != null and (.nodes | length == 0) and (.floating_nodes | length == 0)) 
+  | .id
+')
+
+# 2. Extract the ID of the window that currently holds focus
+FOCUSED=$(echo "$TREE" | jq -r '.. | select(.focused? == true).id')
+
+# Exit if no windows exist or focus is missing
+[ -z "$IDS" ] || [ -z "$FOCUSED" ] && exit 0
+
+TARGET=""
+
+if [ "$DIRECTION" = "next" ]; then
+    FIRST=""
+    MATCHED=0
+    for id in $IDS; do
+        [ -z "$FIRST" ] && FIRST=$id
+        if [ "$MATCHED" -eq 1 ]; then
+            TARGET=$id
+            break
+        fi
+        [ "$id" = "$FOCUSED" ] && MATCHED=1
+    done
+    # If the focused window was at the end of the list, wrap to the first window
+    if [ "$MATCHED" -eq 1 ] && [ -z "$TARGET" ]; then
+        TARGET=$FIRST
+    fi
+else
+    PREV=""
+    for id in $IDS; do
+        if [ "$id" = "$FOCUSED" ]; then
+            TARGET=$PREV
+            break
+        fi
+        PREV=$id
+    done
+    # If target is empty, focused was the first item; wrap to the last window
+    if [ -z "$TARGET" ]; then
+        for id in $IDS; do LAST=$id; done
+        TARGET=$LAST
+    fi
+fi
+
+# Pass focus back to Sway if a valid target ID was mapped
+[ -n "$TARGET" ] && swaymsg "[con_id=$TARGET] focus"

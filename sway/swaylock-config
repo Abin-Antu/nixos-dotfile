@@ -1,0 +1,36 @@
+image=~/Pictures/lock_wallpaper.png
+scaling=fill
+indicator-x-position=180
+indicator-y-position=620
+clock
+indicator
+
+timestr=%I:%M %p
+datestr=%a • %d %b %Y
+
+font=FiraCode Nerd Font
+font-size=22
+
+ignore-empty-password
+
+indicator-radius=90
+indicator-thickness=5
+
+inside-color=0b132099
+inside-ver-color=4f7ca899
+inside-wrong-color=d1696999
+
+ring-color=1d2d42ff
+ring-ver-color=6ea8dfff
+ring-wrong-color=e06c75ff
+
+key-hl-color=7fb4ffff
+bs-hl-color=e5c07bff
+
+separator-color=00000000
+
+text-color=e6edf3ff
+text-ver-color=ffffffff
+text-wrong-color=ffffffff
+
+line-uses-inside
